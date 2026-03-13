@@ -14,7 +14,7 @@ MOVE_MAP = {
 class Solver:
     def __init__(self):
         self.puzzle = GameGrid(False)
-        self.solver = ctypes.CDLL("./libsolver.so")
+        self.solver = ctypes.CDLL("../solver/libsolver.so")
 
         self.solver.best_move.argtypes = [ctypes.c_uint64]
         self.solver.best_move.restype = ctypes.c_int

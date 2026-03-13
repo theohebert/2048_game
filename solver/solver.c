@@ -90,6 +90,46 @@ board_t move_down(board_t board) {
     }
     return new_board;
 }
+double evaluate(board_t board) {
+    // Cette fonction doit être implémentée pour évaluer la qualité d'un plateau de jeu donné.
+    
+    double score = 0.0;
+    int empty_tiles = 0;
+    int max_tile = 0;
+    for(int i = 0; i < 16; i++) {
+        int tile = get_tile(board, i);
+        if (tile > max_tile) {
+            max_tile = tile;
+        }
+        if (i == 0 || i == 3) {
+            score += (1 << tile) * 20; // Bonus pour les coins du haut
+        }
+        if (i<4)
+        {
+            score += (1 << tile) * 8; // Bonus pour la première ligne
+        }
+        if (i%4 == 0)
+        {
+            score += (1 << tile) * 8; // Bonus pour la première colonne
+        }
+
+        if (i<8 && i>4)
+        {
+            score += (1 << tile) * 4; // Bonus pour la deuxième ligne
+        }
+        
+
+        if(tile == 0) {
+            empty_tiles++;
+        } else {
+            score += (1 << tile); // 2^tile
+        }
+    }
+    score += empty_tiles * 100; // Bonus pour les tuiles vides
+    score += (1 << max_tile) * 20; // Bonus pour la tuile maximale
+
+    return score;
+}
 
 double expectimax(board_t board, int depth){
     // Cette fonction doit être implémentée pour calculer la valeur expectimax d'un plateau de jeu donné.

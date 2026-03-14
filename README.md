@@ -1,25 +1,17 @@
-2048 Python
-===========
+# 2048 avec solver
 
-[![Run on Repl.it](https://repl.it/badge/github/yangshun/2048-python)](https://repl.it/github/yangshun/2048-python)
+## Projet IA pour les jeux
 
----
+Ce projet utilise une base de code trouvée sur github pour le jeu de 2048 en pyrhon. Le code de base a été modifier pour implementer les règles originelles du 2048 (seul des 2 pouvaient apparaître, le code a été modifié pour que des 4 puissent aussi apparaître). 
 
-**⚠️NOTE⚠️**: We won't be accepting any contributions/changes to the project anymore. It is now readonly.
+Le code a aussi été modifié pour qu'un algorithme puisse jouer et echanger avec le jeu.
 
----
+## Compilation et lancement
 
-Based on the popular game [2048](https://github.com/gabrielecirulli/2048) by Gabriele Cirulli. The game's objective is to slide numbered tiles on a grid to combine them to create a tile with the number 2048. Here is a Python version that uses TKinter! 
+Il faut dans un premier temps compiler le solver codé en C avec la commande suivante si ce n'est pas déjà fait:
 
-![screenshot](img/screenshot.png)
+* gcc -O3 -shared -fPIC solver.c -o libsolver.so
 
-To start the game, run:
-    
-    $ python3 puzzle.py
+On peut ensuite lancer le solver avec la commande suivante :
 
-
-Contributors:
-==
-
-- [Yanghun Tay](http://github.com/yangshun)
-- [Emmanuel Goh](http://github.com/emman27)
+* python3 solver.py

@@ -1,6 +1,10 @@
+
 #include <stdint.h>
+#include <math.h>
+#include <stdlib.h>
 
 typedef uint64_t board_t;
+
 
 
 static inline int get_tile(board_t board, int index) {
@@ -90,75 +94,182 @@ board_t move_down(board_t board) {
     }
     return new_board;
 }
-double evaluate(board_t board) {
-    // Cette fonction doit être implémentée pour évaluer la qualité d'un plateau de jeu donné.
-    
-    double score = 0.0;
-    int empty_tiles = 0;
-    int max_tile = 0;
+
+int count_empty(board_t board) {
+    int count = 0;
+    for(int i = 0; i < 16; i++) {
+        if(get_tile(board, i) == 0)
+            count++;
+    }
+    return count;
+}
+
+double smoothness(board_t board) {
+    double score = 0;
+
     for(int i = 0; i < 16; i++) {
         int tile = get_tile(board, i);
-        if (tile > max_tile) {
-            max_tile = tile;
-        }
-        if (i == 0 || i == 3) {
-            score += (1 << tile) * 20; // Bonus pour les coins du haut
-        }
-        if (i<4)
-        {
-            score += (1 << tile) * 8; // Bonus pour la première ligne
-        }
-        if (i%4 == 0)
-        {
-            score += (1 << tile) * 8; // Bonus pour la première colonne
-        }
+        if(tile == 0) continue;
 
-        if (i<8 && i>4)
-        {
-            score += (1 << tile) * 4; // Bonus pour la deuxième ligne
-        }
-        
+        int x = i % 4;
+        int y = i / 4;
 
-        if(tile == 0) {
-            empty_tiles++;
-        } else {
-            score += (1 << tile); // 2^tile
+        if(x < 3) {
+            int right = get_tile(board, i+1);
+            if(right != 0)
+                score -= (tile - right) * (tile - right);
+                
+        }
+        if(y < 3) {
+            int down = get_tile(board, i+4);
+            if(down != 0)
+                score -= (tile - down) * (tile - down);
         }
     }
-    score += empty_tiles * 100; // Bonus pour les tuiles vides
-    score += (1 << max_tile) * 20; // Bonus pour la tuile maximale
+    return score;
+}
+
+double monotonicity(board_t board) {
+    double totals[4] = {0,0,0,0};
+    for(int y=0;y<4;y++) {
+        for(int x=0;x<3;x++) {
+            int a = get_tile(board, y*4 + x);
+            int b = get_tile(board, y*4 + x + 1);
+            if(a != 0 && b != 0){
+                if(a > b)
+                    totals[0] += b - a;
+                else
+                    totals[1] += a - b;
+            }
+        }
+    }
+    for(int x=0;x<4;x++) {
+        for(int y=0;y<3;y++) {
+            int a = get_tile(board, y*4 + x);
+            int b = get_tile(board, (y+1)*4 + x);
+            if(a != 0 && b != 0){                
+                if(a > b)
+                    totals[2] += b - a;
+                else
+                    totals[3] += a - b;
+            }
+        }
+    }
+    return fmax(totals[0], totals[1]) + fmax(totals[2], totals[3]);
+}
+
+double corner_bonus(board_t board, int max) {
+    int corners[4] = {0,3,12,15};
+    for(int i=0;i<4;i++) {
+        if(get_tile(board,corners[i]) == max)
+            return max;
+    }
+    return 0;
+}
+
+int max_tile(board_t board) {
+    int max = 0;
+    for(int i=0;i<16;i++) {
+        int tile = get_tile(board,i);
+        if(tile > max)
+            max = tile;
+    }
+    return max;
+}
+
+double snake(board_t board) {
+    int weights[16] = {
+        65536, 32768, 16384, 8192,
+        512,   1024,  2048,  4096,
+        256,   128,   64,    32,
+        2,     4,     8,     16
+    };
+    double score = 0;
+    for(int i=0;i<16;i++) {
+        int tile = get_tile(board,i);
+        if(tile != 0)
+            score += tile * weights[i];;
+    }
+    return score;
+}
+
+double values(board_t board) {
+    double score = 0;
+    for(int i=0;i<16;i++) {
+        int tile = get_tile(board,i);
+        if(tile != 0)
+            score += tile * tile; // valorise les tuiles élevées
+    }
+    return score;
+}
+
+double evaluate(board_t board) {
+    int empty = count_empty(board);
+    double smooth = smoothness(board);
+    double mono = monotonicity(board);
+    int max = max_tile(board);
+    double corner = corner_bonus(board, max);
+    double snake_score = snake(board);
+
+    double score = 0.0;
+
+    score += empty * 270.0;          // tuiles vides
+    score += smooth * 7.0;           // smoothness
+    score += mono * 50.0;            // monotonicité
+    score += max * 2000;      // max tile fortement valorisée (on utilise la log2 du tile pour éviter les grands écarts)
+    score += corner * 500;        // coin bonus renforcé
+    score += snake_score * 0.1;     // snake pattern
+    score += values(board) * 0.1;   // valeur des tuiles
 
     return score;
 }
 
-double expectimax(board_t board, int depth){
-    // Cette fonction doit être implémentée pour calculer la valeur expectimax d'un plateau de jeu donné.
-    // Le paramètre 'board' représente l'état actuel du plateau de jeu sous forme de bitboard.
-    // Le paramètre 'depth' indique la profondeur maximale de l'exploration de l'arbre expectimax.
-    // La fonction doit retourner une valeur double représentant l'évaluation du plateau de jeu.
-
+double expectimax(board_t board, int depth, int is_player) {
     if(depth == 0) {
         return evaluate(board);
     }
 
-    double max_score = -1e18;
+    if(is_player) {
+        double max_score = -1e18;
+        int valid_move = 0;
 
-    for(int move = 0; move < 4; move++) {
-        board_t new_board;
-        if(move == 0) new_board = move_up(board);
-        if(move == 1) new_board = move_down(board);
-        if(move == 2) new_board = move_left(board);
-        if(move == 3) new_board = move_right(board);
+        for(int move = 0; move < 4; move++) {
+            board_t new_board;
+            if(move == 0) new_board = move_up(board);
+            if(move == 1) new_board = move_down(board);
+            if(move == 2) new_board = move_left(board);
+            if(move == 3) new_board = move_right(board);
 
-        if(new_board == board) continue;
-
-        double score = expectimax(new_board, depth - 1);
-        if(score > max_score) {
-            max_score = score;
+            if(new_board == board) continue;
+            valid_move = 1;
+            double score = expectimax(new_board, depth - 1, 0);
+            if(score > max_score) {
+                max_score = score;
+            }
         }
+        if(!valid_move)
+            return evaluate(board)-10000; // pénalité pour les positions sans coup possible
+        return max_score;
     }
+    else {
+        double total = 0.0;
+        int empty = count_empty(board);
 
-    return max_score;
+        if(empty == 0)
+            return evaluate(board)-10000; // pénalité pour les positions sans coup possible
+        for(int i = 0; i < 16; i++) {
+            if(get_tile(board, i) == 0) {
+                
+                board_t board2 = board | ((board_t)1 << (i*4));
+                board_t board4 = board | ((board_t)2 << (i*4));
+                total += 0.9 * expectimax(board2, depth-1, 1);
+                total += 0.1 * expectimax(board4, depth-1, 1);
+            }
+        }
+        
+        return total / empty;
+    }
+    
 }
 
 int best_move(board_t board) {
@@ -178,8 +289,15 @@ int best_move(board_t board) {
         if(move == 3) new_board = move_right(board);
 
         if(new_board == board) continue;
+        
+        int empty = count_empty(new_board);
+        int depth;
+        if(empty >= 8) depth = 4;
+        else if(empty >= 6) depth = 5;
+        else if(empty >= 4) depth = 6;
+        else depth = 7;
 
-        double score = expectimax(new_board, 4);
+        double score = expectimax(new_board, depth, 0); // Profondeur de 4 pour l'exploration
         if(score > best_score) {
             best_score = score;
             best = move;

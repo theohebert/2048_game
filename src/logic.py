@@ -69,7 +69,7 @@ def game_state(mat):
     # check for win cell
     for i in range(len(mat)):
         for j in range(len(mat[0])):
-            if mat[i][j] == 2048:
+            if mat[i][j] == 65536:
                 return 'win'
     # check for any zero entries
     for i in range(len(mat)):

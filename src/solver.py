@@ -1,5 +1,6 @@
 import logic
 from puzzle import GameGrid
+import constants as c
 import ctypes
 import time
 
@@ -14,7 +15,7 @@ MOVE_MAP = {
 class Solver:
     def __init__(self):
         self.puzzle = GameGrid(False)
-        self.solver = ctypes.CDLL("../solver/libsolver.so")
+        self.solver = ctypes.CDLL("./solver/libsolver.so")
 
         self.solver.best_move.argtypes = [ctypes.c_uint64]
         self.solver.best_move.restype = ctypes.c_int
@@ -31,6 +32,14 @@ class Solver:
                 self.puzzle.matrix = logic.add_two(self.puzzle.matrix)
             self.puzzle.update_grid_cells()
             if logic.game_state(self.puzzle.matrix) != 'not over':
+                if logic.game_state(self.puzzle.matrix) == 'win':
+                    wait = input("You win! Press Enter to continue...")
+                    self.puzzle.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
+                    self.puzzle.grid_cells[1][2].configure(text="Win!", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
+                else:
+                    wait = input("Game over! Press Enter to continue...")
+                    self.puzzle.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
+                    self.puzzle.grid_cells[1][2].configure(text="Lose!", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
                 break
             time.sleep(0.05)
         

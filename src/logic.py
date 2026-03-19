@@ -91,6 +91,20 @@ def game_state(mat):
             return 'not over'
     return 'lose'
 
+def get_score(mat):
+    score = 0
+    for i in range(len(mat)):
+        for j in range(len(mat[0])):
+            score += mat[i][j]
+    return score
+
+def max_tile(mat):
+    max_tile = 0
+    for i in range(len(mat)):
+        for j in range(len(mat[0])):
+            if mat[i][j] > max_tile:
+                max_tile = mat[i][j]
+    return max_tile
 ###########
 # Task 2a #
 ###########
@@ -204,3 +218,5 @@ def right(game):
     game = cover_up(game)[0]
     game = reverse(game)
     return game, done
+
+

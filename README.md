@@ -2,9 +2,12 @@
 
 ## Projet IA pour les jeux
 
-Ce projet utilise une base de code trouvée sur github pour le jeu de 2048 en pyrhon. Le code de base a été modifier pour implementer les règles originelles du 2048 (seul des 2 pouvaient apparaître, le code a été modifié pour que des 4 puissent aussi apparaître). 
+Ce projet utilise une base de code trouvée sur github pour le jeu de 2048 en pyrhon. Le code de base a été modifier pour implementer les règles originelles du 2048 (seul des 2 pouvaient apparaître, le code a été modifié pour que des 4 puissent aussi apparaître).
 
 Le code a aussi été modifié pour qu'un algorithme puisse jouer et echanger avec le jeu.
+
+
+Heuristique : https://stackoverflow.com/questions/22342854/what-is-the-optimal-algorithm-for-the-game-2048/22498940#22498940 
 
 ## Compilation et lancement
 

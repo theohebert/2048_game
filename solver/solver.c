@@ -30,6 +30,8 @@ typedef struct {
 static cache_entry_t cache[CACHE_SIZE];
 static uint16_t move_table[65536]; // ligne après mouvement gauche
 static uint16_t move_table_right[65536];
+static uint16_t move_table_up[65536];
+static uint16_t move_table_down[65536];
 
 static int initialized = 0;
 
@@ -114,7 +116,8 @@ void init_move_tables() {
         move_table_right[i] = ((res & 0xF000) >> 12)
                              | ((res & 0x0F00) >> 4)
                              | ((res & 0x00F0) << 4)
-                             | ((res & 0x000F) << 12);
+                             | ((res & 0x000F) << 12);        
+
     }
 }
 
@@ -240,13 +243,12 @@ int count_empty(board_t x) {
     return __builtin_popcountll(x);
 }
 double count_empty_normalized(board_t board) {
-    int empty = count_empty(board); // Ta fonction bit-trick actuelle
+    int empty = count_empty(board); 
     if (empty == 0) return 0.0;
-    // log(1) = 0, log(16) = 2.77
     // On normalise pour que le résultat soit entre 0 et 1
     return log(empty) / log(16); 
 }
-
+/*
 double smoothness(board_t board) {
     double score = 0;
 
@@ -271,6 +273,7 @@ double smoothness(board_t board) {
     }
     return score;
 }
+    */
 double smoothness_normalized(board_t board) {
     double penalty = 0;
     
@@ -280,7 +283,6 @@ double smoothness_normalized(board_t board) {
 
         int x = i % 4;
         int y = i / 4;
-
         // Voisin de droite
         if (x < 3) {
             int right = get_tile(board, i + 1);
@@ -289,7 +291,6 @@ double smoothness_normalized(board_t board) {
                 penalty += abs(val - right);
             }
         }
-        
         // Voisin du bas
         if (y < 3) {
             int down = get_tile(board, i + 4);
@@ -298,15 +299,13 @@ double smoothness_normalized(board_t board) {
             }
         }
     }
-
     /* Normalisation : 
        Il y a 24 paires de voisins possibles au total. 
        Diviser par 24 ramène le score à une "rugosité moyenne par voisin".
-       Le signe négatif transforme la pénalité en un score à maximiser.
-    */
+       Le signe négatif transforme la pénalité en un score à maximiser.*/
     return -penalty / 24.0;
 }
-
+/*
 double monotonicity(board_t board) {
     double totals[4] = {0,0,0,0};
     for(int y=0;y<4;y++) {
@@ -336,6 +335,7 @@ double monotonicity(board_t board) {
     }
     return fmin(totals[0], totals[1]) + fmin(totals[2], totals[3]);
 }
+*/
 double monotonicity_normalized(board_t board) {
     double total_score = 0;
 
@@ -384,6 +384,15 @@ double corner_bonus(board_t board, int max) {
     }
     return 0;
 }
+double corner_bonus_normalized(board_t board, int max) {
+    int corners[4] = {0,3,12,15};
+    for(int i=0;i<4;i++) {
+        if(get_tile(board,corners[i]) == max)
+            return (double)max / 15.0; // Normalisation pour que le bonus soit entre 0 et 1
+    }
+    return 0.0;   
+}
+/*
 double snake_normalized(board_t board) {
     // Matrice de poids (valeurs décroissantes en zigzag)
     const double weights[16] = {
@@ -403,6 +412,7 @@ double snake_normalized(board_t board) {
     // Normalisation : Diviser par le score d'un board parfait
     return score / 100.0; 
 }
+*/
 
 int max_tile(board_t board) {
     int max = 0;
@@ -445,8 +455,33 @@ double gradient(board_t board) {
     }
     return score;
 }
+double gradient_normalized(board_t board) {
+    const double weights[16] = {
+        4, 3, 2, 1,
+        3, 2, 1, 0,
+        2, 1, 0, -1,
+        1, 0, -1, -2
+    };
+    double score = 0;
+    for (int i = 0; i < 16; i++) {
+        int rank = get_tile(board, i);
+        if (rank > 0) {
+            score += (double)rank * weights[i];
+        }
+    }
+
+    /* Normalisation : 
+       Somme max théorique (~15 * 24) = 360.
+       On divise par 200 pour garder une influence équilibrée avec les autres méthodes.
+    */
+    return score / 200.0;
+}
+
 
 double merge_potential(board_t board) {
+    //revoie un score basé sur le nombre de paires de tuiles adjacentes de même valeur, pondéré par leur rang
+    //plus il y a de paires de tuiles élevées, plus le score est élevé
+    //ordre de grandeur : une paire de tuiles 1024 vaut 2048 points, une paire de tuiles 512 vaut 1024 points, etc.
     double score = 0;
     for(int y = 0; y < 4; y++)
         for(int x = 0; x < 3; x++)
@@ -458,7 +493,40 @@ double merge_potential(board_t board) {
                 score += (1 << get_tile(board, y*4+x));
     return score;
 }
+//inutilisée pour l'instant, mais peut être réintégrée plus tard
+double merge_potential_normalized(board_t board) {
+    double score = 0;
+    int count = 0;
 
+    // Horizontal
+    for (int y = 0; y < 4; y++) {
+        for (int x = 0; x < 3; x++) {
+            int val = get_tile(board, y * 4 + x);
+            if (val != 0 && val == get_tile(board, y * 4 + x + 1)) {
+                score += val; // On ajoute le rang (ex: 10 pour une tuile 1024)
+                count++;
+            }
+        }
+    }
+    // Vertical
+    for (int x = 0; x < 4; x++) {
+        for (int y = 0; y < 3; y++) {
+            int val = get_tile(board, y * 4 + x);
+            if (val != 0 && val == get_tile(board, (y + 1) * 4 + x)) {
+                score += val;
+                count++;
+            }
+        }
+    }
+
+    /* Normalisation : 
+       Max fusions possibles = 24. Max rang = 15.
+       On divise par 100 pour rester dans une zone [0, 1.5] environ.
+    */
+    return score / 100.0;
+}
+
+/*
 double values(board_t board) {
     double score = 0;
     for(int i=0;i<16;i++) {
@@ -468,7 +536,8 @@ double values(board_t board) {
     }
     return score;
 }
-
+*/
+/*
 double isolation_penalty(board_t board) {
     double penalty = 0;
     for(int i = 0; i < 16; i++) {
@@ -488,7 +557,7 @@ double isolation_penalty(board_t board) {
     }
     return penalty;
 }
-
+*/
 
 
 double evaluate(board_t board, weights_t *w) {
@@ -554,7 +623,7 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
                 }
         }
         if(!valid_move)
-            result = evaluate(board, w)*-2; // pénalité pour les positions sans coup possible
+            result = evaluate(board, w)*-1; // pénalité pour les positions sans coup possible
         else
             result = max_score;
     }
@@ -563,7 +632,7 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
         int empty = count_empty(board);
 
         if(empty == 0)
-            result = evaluate(board, w)*-2; // pénalité pour les positions sans coup possible
+            result = evaluate(board, w)*-1; // pénalité pour les positions sans coup possible
         else {
                 #pragma omp single nowait
                 {
@@ -629,7 +698,8 @@ int best_move(board_t board) {
 
         if(empty >= 6) depth = 6;
         else if(empty >= 4) depth = 7;
-        else depth = 8;
+        else if(empty >= 2) depth = 8;
+        else depth = 9;
 
         #pragma omp task firstprivate(move, new_board, depth)
         {
@@ -673,7 +743,8 @@ int best_move_with_weights(board_t board, weights_t *w) {
 
         if(empty >= 6) depth = 6;
         else if(empty >= 4) depth = 7;
-        else depth = 8;
+        else if(empty >= 2) depth = 8;
+        else depth = 9;
 
         #pragma omp task firstprivate(move, new_board, depth)
         {

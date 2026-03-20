@@ -14,10 +14,8 @@ MOVE_MAP = {
 
 class Weights(ctypes.Structure):
     _fields_ = [
-        ("empty_weight", ctypes.c_double),
-        ("smooth_weight", ctypes.c_double),
-        ("mono_weight", ctypes.c_double),
-        ("corner_weight", ctypes.c_double),
+        ("gradient_weight", ctypes.c_double),
+        ("merge_weight", ctypes.c_double)
     ]
 
 class Solver:
@@ -53,7 +51,7 @@ class Solver:
                     self.puzzle.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
                     self.puzzle.grid_cells[1][2].configure(text="Lose!", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
                 break
-            time.sleep(0.05)
+            #time.sleep(0.05)
         
     def get_best_move(self):
         bitboard = self.puzzle.matrix_to_bitboard()

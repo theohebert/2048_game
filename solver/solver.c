@@ -19,10 +19,11 @@ typedef struct {
 } cache_entry_t;
 
 typedef struct {
+    /*
     double empty_weight;
     double smooth_weight;
     double mono_weight;
-    double corner_weight;
+    double corner_weight;*/
     double gradient_weight;
     double merge_weight;
 } weights_t;
@@ -30,8 +31,6 @@ typedef struct {
 static cache_entry_t cache[CACHE_SIZE];
 static uint16_t move_table[65536]; // ligne après mouvement gauche
 static uint16_t move_table_right[65536];
-static uint16_t move_table_up[65536];
-static uint16_t move_table_down[65536];
 
 static int initialized = 0;
 
@@ -137,59 +136,7 @@ static inline board_t set_tile(board_t board, int index, int value) {
     return board;
 }
 
-/*
-board_t move_left(board_t board) {
-    board_t new_board = board;
-    for(int row = 0; row < 4; row++) {
-        int line[4];
-        for(int col = 0; col < 4; col++)
-            line[col] = get_tile(board, row*4 + col);
-        process_line(line);
-        for(int col = 0; col < 4; col++)
-            new_board = set_tile(new_board, row*4 + col, line[col]);
-    }
-    return new_board;
-}
 
-board_t move_right(board_t board) {
-    board_t new_board = board;
-    for(int row = 0; row < 4; row++) {
-        int line[4];
-        for(int col = 0; col < 4; col++)
-            line[3-col] = get_tile(board, row*4 + col);
-        process_line(line);
-        for(int col = 0; col < 4; col++)
-            new_board = set_tile(new_board, row*4 + col, line[3-col]);
-    }
-    return new_board;
-}
-
-board_t move_up(board_t board) {
-    board_t new_board = board;
-    for(int col = 0; col < 4; col++) {
-        int line[4];
-        for(int row = 0; row < 4; row++)
-            line[row] = get_tile(board, row*4 + col);
-        process_line(line);
-        for(int row = 0; row < 4; row++)
-            new_board = set_tile(new_board, row*4 + col, line[row]);
-    }
-    return new_board;
-}
-
-board_t move_down(board_t board) {
-    board_t new_board = board;
-    for(int col = 0; col < 4; col++) {
-        int line[4];
-        for(int row = 0; row < 4; row++)
-            line[3-row] = get_tile(board, row*4 + col);
-        process_line(line);
-        for(int row = 0; row < 4; row++)
-            new_board = set_tile(new_board, row*4 + col, line[3-row]);
-    }
-    return new_board;
-}
-*/
 board_t move_left(board_t board) {
     board_t result = 0;
     for(int row = 0; row < 4; row++) {
@@ -242,6 +189,7 @@ int count_empty(board_t x) {
     x = ~x & 0x1111111111111111ULL;
     return __builtin_popcountll(x);
 }
+
 double count_empty_normalized(board_t board) {
     int empty = count_empty(board); 
     if (empty == 0) return 0.0;
@@ -482,6 +430,7 @@ double merge_potential(board_t board) {
     //revoie un score basé sur le nombre de paires de tuiles adjacentes de même valeur, pondéré par leur rang
     //plus il y a de paires de tuiles élevées, plus le score est élevé
     //ordre de grandeur : une paire de tuiles 1024 vaut 2048 points, une paire de tuiles 512 vaut 1024 points, etc.
+    //solustion:[0 ; 30 000] environ pour un board très avancé
     double score = 0;
     for(int y = 0; y < 4; y++)
         for(int x = 0; x < 3; x++)
@@ -565,16 +514,14 @@ double evaluate(board_t board, weights_t *w) {
 
     double score = 0.0;
 
-    score += count_empty_normalized(board) * w->empty_weight;
-    score += smoothness_normalized(board) * w->smooth_weight;
-    score += monotonicity_normalized(board) * w->mono_weight;
-    score += corner_bonus(board, max) * w->corner_weight;
-    //score += (1ULL << max) * 20.0;                   
+    //score += count_empty_normalized(board) * w->empty_weight;
+    //score += smoothness_normalized(board) * w->smooth_weight;
+    //score += monotonicity_normalized(board) * w->mono_weight;
+    //score += corner_bonus(board, max) * w->corner_weight;
+                      
     score += merge_potential(board) * w -> merge_weight; // ajouter un poids pour le potentiel de fusion
     score += gradient(board) * w -> gradient_weight; // réutiliser corner_weight pour le gradient    
-    //score += isolation_penalty(board) * 10.0; 
-    //score += snake_normalized(board) * w->corner_weight; // réutiliser corner_weight pour le snake
-
+ 
     return score;
 }
 
@@ -588,39 +535,33 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
     if(depth >= 4) {
         if(safe_cache_get(key, &cached)) return cached;
     }
-
     double result;
-
     if(is_player) {
         double max_score = -1e18;
         int valid_move = 0;
+        #pragma omp single nowait
+        {
+            for(int move = 0; move < 4; move++) {
+                board_t new_board;
+                if(move == 0) new_board = move_left(board);
+                if(move == 1) new_board = move_up(board);
+                if(move == 2) new_board = move_right(board);
+                if(move == 3) new_board = move_down(board);
 
-            #pragma omp single nowait
-            {
-                for(int move = 0; move < 4; move++) {
+                if(new_board == board) continue;
+                valid_move = 1;
 
-                    board_t new_board;
+                #pragma omp task shared(max_score)
+                {
+                    double score = expectimax(new_board, depth-1, 0, w);
 
-                    if(move == 0) new_board = move_left(board);
-                    if(move == 1) new_board = move_up(board);
-                    if(move == 2) new_board = move_right(board);
-                    if(move == 3) new_board = move_down(board);
-
-                    if(new_board == board) continue;
-
-                    valid_move = 1;
-
-                    #pragma omp task shared(max_score)
+                    #pragma omp critical
                     {
-                        double score = expectimax(new_board, depth-1, 0, w);
-
-                        #pragma omp critical
-                        {
-                            if(score > max_score)
-                                max_score = score;
-                        }
+                        if(score > max_score)
+                            max_score = score;
                     }
                 }
+            }
         }
         if(!valid_move)
             result = evaluate(board, w)*-1; // pénalité pour les positions sans coup possible
@@ -634,26 +575,23 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
         if(empty == 0)
             result = evaluate(board, w)*-1; // pénalité pour les positions sans coup possible
         else {
-                #pragma omp single nowait
-                {
-                    for(int i=0;i<16;i++) {
+            #pragma omp single nowait
+            {
+                for(int i=0;i<16;i++) {
+                    if(get_tile(board,i) != 0) continue;
 
-                        if(get_tile(board,i) != 0) continue;
+                    board_t board2 = board | ((board_t)1 << (i*4));
+                    board_t board4 = board | ((board_t)2 << (i*4));
 
-                        board_t board2 = board | ((board_t)1 << (i*4));
-                        board_t board4 = board | ((board_t)2 << (i*4));
-
-                        #pragma omp task shared(total)
-                        {
-                            double value =
-                                0.9 * expectimax(board2, depth-1, 1, w) +
-                                0.1 * expectimax(board4, depth-1, 1, w);
-
-                            #pragma omp critical
-                            total += value;
-                        }
+                    #pragma omp task shared(total)
+                    {
+                        double value =
+                            0.9 * expectimax(board2, depth-1, 1, w) +
+                            0.1 * expectimax(board4, depth-1, 1, w);
+                        #pragma omp critical
+                        total += value;
                     }
-                
+                }     
             }  
         } 
         result = total / empty;
@@ -668,10 +606,11 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
 
 int best_move(board_t board) {
      weights_t w = {
+        /*
         .empty_weight = 30.0,
         .smooth_weight = 15.0,
         .mono_weight = 40.0,
-        .corner_weight = 15.0,
+        .corner_weight = 15.0,*/
         .gradient_weight = 40.0,
         .merge_weight = 20.0
     };
@@ -699,7 +638,7 @@ int best_move(board_t board) {
         if(empty >= 6) depth = 6;
         else if(empty >= 4) depth = 7;
         else if(empty >= 2) depth = 8;
-        else depth = 9;
+        else depth = 10; // profondeur maximale pour les positions très avancées
 
         #pragma omp task firstprivate(move, new_board, depth)
         {
@@ -744,7 +683,7 @@ int best_move_with_weights(board_t board, weights_t *w) {
         if(empty >= 6) depth = 6;
         else if(empty >= 4) depth = 7;
         else if(empty >= 2) depth = 8;
-        else depth = 9;
+        else depth = 10;
 
         #pragma omp task firstprivate(move, new_board, depth)
         {

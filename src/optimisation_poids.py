@@ -68,7 +68,6 @@ def evaluate_weights(w, solver_instance):
           f"{weights.mono_weight:.1f}, {weights.corner_weight:.1f} | "
           f"Score: {mean_score:.1f}, MaxTile: {mean_tile}")
 
-    # 💥 IMPORTANT : priorité à la tuile max
     fitness = mean_tile * 1e6 + mean_score
 
     return -fitness

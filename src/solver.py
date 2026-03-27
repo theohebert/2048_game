@@ -86,7 +86,7 @@ class Solver:
                     self.puzzle.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
                     self.puzzle.grid_cells[1][2].configure(text="Lose!", bg=c.BACKGROUND_COLOR_CELL_EMPTY)
                 break
-            time.sleep(0.05)
+            
 
 
 

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdio.h>
 
 pthread_mutex_t cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -19,8 +20,9 @@ typedef struct {
 } cache_entry_t;
 
 typedef struct {
+    
+    //double empty_weight;
     /*
-    double empty_weight;
     double smooth_weight;
     double mono_weight;
     double corner_weight;*/
@@ -513,15 +515,21 @@ double evaluate(board_t board, weights_t *w) {
     int max = max_tile(board);
 
     double score = 0.0;
-
+    //double empty_score =(1<<count_empty(board)) * w->empty_weight;
+    //score += empty_score;
     //score += count_empty_normalized(board) * w->empty_weight;
     //score += smoothness_normalized(board) * w->smooth_weight;
     //score += monotonicity_normalized(board) * w->mono_weight;
     //score += corner_bonus(board, max) * w->corner_weight;
-                      
-    score += merge_potential(board) * w -> merge_weight; // ajouter un poids pour le potentiel de fusion
-    score += gradient(board) * w -> gradient_weight; // réutiliser corner_weight pour le gradient    
- 
+    double merge_score = merge_potential(board) * w->merge_weight;
+    double gradient_score = gradient(board) * w->gradient_weight;
+
+    score += merge_score;
+    score += gradient_score;
+    //score += merge_potential(board) * w -> merge_weight; // ajouter un poids pour le potentiel de fusion
+    //score += gradient(board) * w -> gradient_weight; // réutiliser corner_weight pour le gradient    
+    //printf("Score évaluation : %f, gradient : %f, merge : %f \n", score, gradient_score, merge_score);
+
     return score;
 }
 
@@ -564,7 +572,7 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
             }
         }
         if(!valid_move)
-            result = evaluate(board, w)*-1; // pénalité pour les positions sans coup possible
+            result = fmin(evaluate(board, w)*-1,evaluate(board, w)); // pénalité pour les positions sans coup possible
         else
             result = max_score;
     }
@@ -573,7 +581,8 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
         int empty = count_empty(board);
 
         if(empty == 0)
-            result = evaluate(board, w)*-1; // pénalité pour les positions sans coup possible
+                
+            result = fmin(evaluate(board, w)*-1,evaluate(board, w)); // pénalité pour les positions sans coup possible
         else {
             #pragma omp single nowait
             {
@@ -606,8 +615,9 @@ double expectimax(board_t board, int depth, int is_player, weights_t *w) {
 
 int best_move(board_t board) {
      weights_t w = {
+        
+        //.empty_weight = 30.0,
         /*
-        .empty_weight = 30.0,
         .smooth_weight = 15.0,
         .mono_weight = 40.0,
         .corner_weight = 15.0,*/

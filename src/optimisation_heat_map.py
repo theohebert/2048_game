@@ -152,6 +152,8 @@ def grid_search(x0, y0, x1, y1, step0, step1,processes=5):
 
     for x in range(x0, y0 + 1, step0):
         for y in range(x1, y1 + 1, step1):
+            if (x == 0 or (x==10 and y<=30)):
+                continue
 
             print(f"Testing weights: Gradient={x}, Merge={y}...")
 
@@ -174,4 +176,4 @@ if __name__ == "__main__":
     #play_game(solver.Weights(40.0, 20.0), solver_instance)  # Test rapide avec les poids par défaut
     #init_log_file("game_log.csv")
     #init_log_games_file("grid_search_log.csv")
-    grid_search(0, 100, 0, 100, 10, 10, processes=5)
+    grid_search(0, 100, 0, 100, 10, 10, processes=10)
